@@ -61,3 +61,7 @@ composer require bradvin/wp-ai-client-streaming:^0.1
 ```
 
 Wrapper plugins or other projects that currently use a local path repository can then switch to the Packagist package and remove their custom repository override.
+
+## Local Development Note
+
+If a consumer is still using Composer `type: path` for this repo, Composer will usually resolve it as `dev-main` instead of the Git tag. Switch that consumer to the GitHub VCS repository or Packagist once `v0.1.0` is pushed.
