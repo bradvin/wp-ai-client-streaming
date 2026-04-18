@@ -4,6 +4,11 @@
 
 It exposes core-style `WP_AI_*` classes and helper functions, while leaving initialization explicit so callers can bootstrap it early in their own plugin load order.
 
+If you are reviewing the package for upstream WordPress use, start with:
+
+- `docs/core-review-notes.md`
+- `docs/integration-guide.md`
+
 ## Install
 
 ```bash
@@ -45,3 +50,7 @@ For transport diagnostics against the default registry, call:
 ```php
 $diagnostics = WP_AI_Client_Streaming_Transport_Diagnostics::get_default_registry_diagnostics();
 ```
+
+## License
+
+`bradvin/wp-ai-client-streaming` is licensed under `GPL-2.0-or-later`.

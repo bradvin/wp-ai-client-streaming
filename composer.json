@@ -2,7 +2,7 @@
   "name": "bradvin/wp-ai-client-streaming",
   "description": "WordPress AI streaming adapter package that mirrors WordPress 7 AI integration patterns.",
   "type": "library",
-  "license": "proprietary",
+  "license": "GPL-2.0-or-later",
   "require": {
     "php": ">=7.4"
   },
