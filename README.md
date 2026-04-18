@@ -12,7 +12,7 @@ If you are reviewing the package for upstream WordPress use, start with:
 ## Install
 
 ```bash
-composer require bradvin/wp-ai-client-streaming
+composer require bradvin/wp-ai-client-streaming:^0.1
 ```
 
 ## Bootstrap
@@ -54,3 +54,9 @@ $diagnostics = WP_AI_Client_Streaming_Transport_Diagnostics::get_default_registr
 ## License
 
 `bradvin/wp-ai-client-streaming` is licensed under `GPL-2.0-or-later`.
+
+## Publishing
+
+The first tagged release for this package is intended to be `v0.1.0`.
+
+For the publish checklist, see `docs/publishing.md`.

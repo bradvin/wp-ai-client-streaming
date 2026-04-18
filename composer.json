@@ -3,8 +3,30 @@
   "description": "WordPress AI streaming adapter package that mirrors WordPress 7 AI integration patterns.",
   "type": "library",
   "license": "GPL-2.0-or-later",
+  "keywords": [
+    "wordpress",
+    "ai",
+    "streaming",
+    "composer",
+    "wp-ai-client"
+  ],
+  "homepage": "https://github.com/bradvin/wp-ai-client-streaming",
+  "support": {
+    "issues": "https://github.com/bradvin/wp-ai-client-streaming/issues",
+    "source": "https://github.com/bradvin/wp-ai-client-streaming"
+  },
+  "authors": [
+    {
+      "name": "bradvin",
+      "homepage": "https://github.com/bradvin",
+      "role": "Developer"
+    }
+  ],
   "require": {
     "php": ">=7.4"
+  },
+  "suggest": {
+    "ext-curl": "Required for true incremental streaming; without cURL the package falls back to the stock HTTP client."
   },
   "autoload": {
     "files": [
