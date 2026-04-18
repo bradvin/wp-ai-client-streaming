@@ -6,9 +6,9 @@ Date: 2026-04-18
 
 Use Git tags for package versions. Do not add a `version` field to `composer.json`.
 
-The intended first public release is:
+The current release line is:
 
-- `v0.1.0`
+- `v0.1.x`
 
 ## Preflight Checks
 
@@ -34,14 +34,14 @@ Make sure:
 Create an annotated tag:
 
 ```bash
-git tag -a v0.1.0 -m "Release v0.1.0"
+git tag -a v0.1.1 -m "Release v0.1.1"
 ```
 
 Push the branch and tag:
 
 ```bash
 git push origin main
-git push origin v0.1.0
+git push origin v0.1.1
 ```
 
 ## Submit To Packagist
@@ -64,4 +64,4 @@ Wrapper plugins or other projects that currently use a local path repository can
 
 ## Local Development Note
 
-If a consumer is still using Composer `type: path` for this repo, Composer will usually resolve it as `dev-main` instead of the Git tag. Switch that consumer to the GitHub VCS repository or Packagist once `v0.1.0` is pushed.
+If a consumer is still using Composer `type: path` for this repo, Composer will usually resolve it as `dev-main` instead of the Git tag. Switch that consumer to the GitHub VCS repository or Packagist once the release tag is pushed.
