@@ -15,6 +15,12 @@ If you are reviewing the package for upstream WordPress use, start with:
 composer require bradvin/wp-ai-client-streaming:^0.1
 ```
 
+## Demo Plugin
+
+If you want a working wrapper plugin and demo UI for this package, see:
+
+- `https://github.com/bradvin/wp-stream`
+
 ## Bootstrap
 
 Initialize the discovery strategy during your plugin bootstrap, before you start registering or using AI providers:
