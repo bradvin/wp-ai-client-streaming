@@ -34,14 +34,14 @@ Make sure:
 Create an annotated tag:
 
 ```bash
-git tag -a v0.1.1 -m "Release v0.1.1"
+git tag -a v0.1.2 -m "Release v0.1.2"
 ```
 
 Push the branch and tag:
 
 ```bash
 git push origin main
-git push origin v0.1.1
+git push origin v0.1.2
 ```
 
 ## Submit To Packagist

@@ -2,6 +2,11 @@
 
 All notable changes to `bradvin/wp-ai-client-streaming` will be documented in this file.
 
+## 0.1.2 - 2026-05-13
+
+- Guard the Composer file autoloader so the package does not fatal when WordPress AI client dependency interfaces are unavailable.
+- Retry streaming adapter loading on WordPress hooks after the AI client dependency stack becomes available.
+
 ## 0.1.1 - 2026-04-18
 
 - Repair the default AI registry transporter when the streaming discovery strategy initializes after another plugin has already instantiated `AiClient::defaultRegistry()`.

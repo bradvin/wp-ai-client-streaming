@@ -63,6 +63,6 @@ $diagnostics = WP_AI_Client_Streaming_Transport_Diagnostics::get_default_registr
 
 ## Publishing
 
-The latest tagged release for this package is `v0.1.1`.
+The latest tagged release for this package is `v0.1.2`.
 
 For the publish checklist, see `docs/publishing.md`.
