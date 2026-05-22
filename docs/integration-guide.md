@@ -84,6 +84,19 @@ The transport emits these hooks:
 
 It also emits `requests-request.progress` while chunks are arriving so existing progress listeners can continue to work.
 
+## Response Normalizers
+
+When `capture_body` is enabled, the transport buffers SSE output and then asks registered normalizers to rebuild the non-streaming JSON response shape expected by the upstream provider parser.
+
+Built-in normalizers currently cover:
+
+- OpenAI Responses API streams.
+- OpenAI-compatible chat completion streams, including OpenRouter-style chunks.
+- Anthropic Messages API streams.
+- Google Generate Content streams.
+
+Add or replace normalizers with the `wp_ai_client_stream_response_normalizers` filter. A normalizer should implement `WP_AI_Client_Streaming_Response_Normalizer_Interface` and return `null` when it cannot handle the captured body.
+
 ## Matching Behavior
 
 By default, the streaming context targets text-style JSON generation requests:

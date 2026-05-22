@@ -71,6 +71,12 @@ if ( ! function_exists( 'wp_ai_client_streaming_load' ) ) {
 
 		require_once __DIR__ . '/includes/ai-client/adapters/class-wp-ai-client-sse-event.php';
 		require_once __DIR__ . '/includes/ai-client/adapters/class-wp-ai-client-sse-parser.php';
+		require_once __DIR__ . '/includes/ai-client/adapters/class-wp-ai-client-streaming-response-normalizer-interface.php';
+		require_once __DIR__ . '/includes/ai-client/adapters/class-wp-ai-client-streaming-openai-responses-normalizer.php';
+		require_once __DIR__ . '/includes/ai-client/adapters/class-wp-ai-client-streaming-openai-chat-completions-normalizer.php';
+		require_once __DIR__ . '/includes/ai-client/adapters/class-wp-ai-client-streaming-anthropic-messages-normalizer.php';
+		require_once __DIR__ . '/includes/ai-client/adapters/class-wp-ai-client-streaming-google-generate-content-normalizer.php';
+		require_once __DIR__ . '/includes/ai-client/adapters/class-wp-ai-client-streaming-response-normalizer-registry.php';
 		require_once __DIR__ . '/includes/ai-client/adapters/class-wp-ai-client-streaming-context.php';
 		require_once __DIR__ . '/includes/ai-client/adapters/class-wp-ai-client-streaming-http-service.php';
 		require_once __DIR__ . '/includes/ai-client/adapters/class-wp-ai-client-streaming-http-client.php';

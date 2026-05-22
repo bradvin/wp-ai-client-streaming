@@ -2,6 +2,15 @@
 
 All notable changes to `bradvin/wp-ai-client-streaming` will be documented in this file.
 
+## Unreleased
+
+## 0.1.3 - 2026-05-22
+
+- Move streamed response body normalization behind provider-specific normalizer classes.
+- Add an OpenAI-compatible chat completions normalizer for OpenRouter-style streamed chunks.
+- Add Anthropic Messages and Google Generate Content normalizers.
+- Add the `wp_ai_client_stream_response_normalizers` filter for registering additional normalizers.
+
 ## 0.1.2 - 2026-05-13
 
 - Guard the Composer file autoloader so the package does not fatal when WordPress AI client dependency interfaces are unavailable.
