@@ -118,9 +118,12 @@ class WP_AI_Client_Streaming_HTTP_Service {
 	 * @return object
 	 */
 	private function sendStreamingRequest( $request, $options, array $analysis ) {
-		$url         = (string) $request->getUri();
-		$contract    = $analysis['contract'];
-		$parsed_args = $this->prepareWpArgs( $request, $options, $url, $analysis );
+		$url               = (string) $request->getUri();
+		$streaming_request = $this->prepareProviderStreamingRequest( $url, $analysis );
+		$url               = $streaming_request['url'];
+		$analysis          = $streaming_request['analysis'];
+		$contract          = $this->prepareResponseNormalizationContract( $analysis['contract'], $url, $analysis );
+		$parsed_args       = $this->prepareWpArgs( $request, $options, $url, $analysis );
 
 		$pre = apply_filters( 'pre_http_request', false, $parsed_args, $url );
 		if ( false !== $pre ) {
@@ -187,6 +190,170 @@ class WP_AI_Client_Streaming_HTTP_Service {
 		}
 
 		return $this->createPsrResponse( $response, $contract );
+	}
+
+	/**
+	 * Applies provider-specific request changes required for streaming APIs.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string               $url      Request URL.
+	 * @param array<string, mixed> $analysis Request analysis.
+	 * @return array{url:string,analysis:array<string,mixed>}
+	 */
+	private function prepareProviderStreamingRequest( string $url, array $analysis ): array {
+		if ( empty( $analysis['contract']['enabled'] ) ) {
+			return array(
+				'url'      => $url,
+				'analysis' => $analysis,
+			);
+		}
+
+		if ( $this->isGoogleGenerateContentRequest( $url ) ) {
+			$analysis['body'] = $this->removeJsonRequestField(
+				$analysis['headers'] ?? array(),
+				$analysis['body'] ?? null,
+				'stream'
+			);
+			$url              = $this->convertGoogleGenerateContentUrlToStreamingUrl( $url );
+		}
+
+		return array(
+			'url'      => $url,
+			'analysis' => $analysis,
+		);
+	}
+
+	/**
+	 * Returns whether the request targets Google's non-streaming generateContent endpoint.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $url Request URL.
+	 * @return bool
+	 */
+	private function isGoogleGenerateContentRequest( string $url ): bool {
+		$host = strtolower( (string) parse_url( $url, PHP_URL_HOST ) );
+		$path = (string) parse_url( $url, PHP_URL_PATH );
+
+		return 'generativelanguage.googleapis.com' === $host
+			&& 1 === preg_match( '/:generateContent$/', $path );
+	}
+
+	/**
+	 * Converts Google's generateContent endpoint URL to its SSE streaming endpoint.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string $url Request URL.
+	 * @return string
+	 */
+	private function convertGoogleGenerateContentUrlToStreamingUrl( string $url ): string {
+		$streaming_url = str_replace( ':generateContent', ':streamGenerateContent', $url );
+
+		if ( function_exists( 'add_query_arg' ) ) {
+			return add_query_arg( 'alt', 'sse', $streaming_url );
+		}
+
+		$separator = false === strpos( $streaming_url, '?' ) ? '?' : '&';
+
+		return $streaming_url . $separator . 'alt=sse';
+	}
+
+	/**
+	 * Removes a top-level field from a JSON request body.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array<string, string> $headers Headers.
+	 * @param string|null           $body    Request body.
+	 * @param string                $field   Field to remove.
+	 * @return string|null
+	 */
+	private function removeJsonRequestField( array $headers, ?string $body, string $field ): ?string {
+		if ( empty( $body ) || ! $this->looksLikeJsonRequest( $headers ) ) {
+			return $body;
+		}
+
+		$decoded = json_decode( $body, true );
+
+		if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $decoded ) || ! array_key_exists( $field, $decoded ) ) {
+			return $body;
+		}
+
+		unset( $decoded[ $field ] );
+
+		$encoded = wp_json_encode( $decoded );
+
+		return false === $encoded ? $body : $encoded;
+	}
+
+	/**
+	 * Adds request details needed to choose the final normalized response shape.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param array<string, mixed> $contract Streaming contract.
+	 * @param string               $url      Request URL.
+	 * @param array<string, mixed> $analysis Request analysis.
+	 * @return array<string, mixed>
+	 */
+	private function prepareResponseNormalizationContract( array $contract, string $url, array $analysis ): array {
+		$contract['request_url']              = $url;
+		$contract['request_path']             = (string) parse_url( $url, PHP_URL_PATH );
+		$contract['expected_response_format'] = $this->detectExpectedResponseFormat( $url, $analysis['headers'] ?? array(), $analysis['body'] ?? null );
+
+		return $contract;
+	}
+
+	/**
+	 * Detects the non-streaming response shape the provider parser expects.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param string                    $url     Request URL.
+	 * @param array<string, string>     $headers Request headers.
+	 * @param string|null               $body    Request body.
+	 * @return string|null
+	 */
+	private function detectExpectedResponseFormat( string $url, array $headers, ?string $body ): ?string {
+		$path = strtolower( (string) parse_url( $url, PHP_URL_PATH ) );
+
+		if ( false !== strpos( $path, '/chat/completions' ) ) {
+			return 'openai-chat-completions';
+		}
+
+		if ( preg_match( '#/responses/?$#', $path ) ) {
+			return 'openai-responses';
+		}
+
+		if ( false !== strpos( $path, '/messages' ) ) {
+			return 'anthropic-messages';
+		}
+
+		if ( false !== strpos( $path, 'generatecontent' ) ) {
+			return 'google-generate-content';
+		}
+
+		if ( empty( $body ) || ! $this->looksLikeJsonRequest( $headers ) ) {
+			return null;
+		}
+
+		$decoded = json_decode( $body, true );
+
+		if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $decoded ) ) {
+			return null;
+		}
+
+		if ( isset( $decoded['messages'] ) && is_array( $decoded['messages'] ) ) {
+			return 'openai-chat-completions';
+		}
+
+		if ( isset( $decoded['contents'] ) && is_array( $decoded['contents'] ) ) {
+			return 'google-generate-content';
+		}
+
+		return null;
 	}
 
 	/**

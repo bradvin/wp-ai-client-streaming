@@ -4,12 +4,22 @@ All notable changes to `bradvin/wp-ai-client-streaming` will be documented in th
 
 ## Unreleased
 
+## 1.0.0 - 2026-05-22
+
+- Add `WP_AI_Client_Streaming_Package_Loader`, a global loader that lets multiple bundled package copies register themselves and loads the newest registered version.
+- Defer adapter class loading until `plugins_loaded` in WordPress requests so active plugins have a chance to register their bundled package versions before one copy wins.
+- Add early proxy helpers for `wp_ai_client_stream_prompt()` and `wp_ai_client_stream()` so wrapper plugins can detect the public API during bootstrap.
+- Add loaded package version, path, and registered package metadata to transport diagnostics.
+- Route Google `generateContent` streaming requests through `streamGenerateContent?alt=sse` and remove the unsupported OpenAI-style `stream` payload field.
+- Bump the documented Composer constraint to `^1.0`.
+
 ## 0.1.3 - 2026-05-22
 
 - Move streamed response body normalization behind provider-specific normalizer classes.
 - Add an OpenAI-compatible chat completions normalizer for OpenRouter-style streamed chunks.
 - Add Anthropic Messages and Google Generate Content normalizers.
 - Add the `wp_ai_client_stream_response_normalizers` filter for registering additional normalizers.
+- Keep chat-completions requests returning a final `choices` response even when a gateway emits Responses-style stream events.
 
 ## 0.1.2 - 2026-05-13
 

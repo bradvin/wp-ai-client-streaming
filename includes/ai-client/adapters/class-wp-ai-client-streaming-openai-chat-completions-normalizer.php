@@ -33,8 +33,31 @@ class WP_AI_Client_Streaming_OpenAI_Chat_Completions_Normalizer implements WP_AI
 		$parser          = new WP_AI_Client_SSE_Parser();
 		$normalized_body = substr( $body, -2 ) === "\n\n" ? $body : $body . "\n\n";
 		$events          = $parser->push( $normalized_body );
-		$response        = array();
-		$choices         = array();
+
+		$normalized = $this->normalize_chat_completion_events( $events );
+
+		if ( is_string( $normalized ) ) {
+			return $normalized;
+		}
+
+		if ( $this->expects_chat_completions_response( $contract ) ) {
+			return $this->normalize_responses_events_as_chat_completion( $events, $contract );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Normalizes OpenAI-compatible chat completion events.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param array<int, WP_AI_Client_SSE_Event> $events Parsed SSE events.
+	 * @return string|null Normalized JSON response body, or null when unsupported.
+	 */
+	private function normalize_chat_completion_events( array $events ): ?string {
+		$response = array();
+		$choices  = array();
 
 		foreach ( $events as $event ) {
 			if ( ! $event instanceof WP_AI_Client_SSE_Event || $event->is_done() ) {
@@ -43,7 +66,7 @@ class WP_AI_Client_Streaming_OpenAI_Chat_Completions_Normalizer implements WP_AI
 
 			$data = $event->get_json_data();
 
-			if ( ! is_array( $data ) || empty( $data['choices'] ) || ! is_array( $data['choices'] ) ) {
+			if ( ! is_array( $data ) || ! isset( $data['choices'] ) || ! is_array( $data['choices'] ) ) {
 				continue;
 			}
 
@@ -91,6 +114,264 @@ class WP_AI_Client_Streaming_OpenAI_Chat_Completions_Normalizer implements WP_AI
 	}
 
 	/**
+	 * Normalizes OpenAI Responses API events into a chat completions response.
+	 *
+	 * Some OpenAI-compatible gateways can emit Responses-style stream events even
+	 * when the caller used a chat-completions model parser. In that case the final
+	 * buffered body still needs to expose `choices`.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param array<int, WP_AI_Client_SSE_Event> $events   Parsed SSE events.
+	 * @param array<string, mixed>               $contract Streaming contract.
+	 * @return string|null Normalized JSON response body, or null when unsupported.
+	 */
+	private function normalize_responses_events_as_chat_completion( array $events, array $contract ): ?string {
+		$response          = array(
+			'object' => 'chat.completion',
+		);
+		$choice            = $this->create_empty_choice( 0 );
+		$latest_response   = null;
+		$terminal_response = null;
+		$has_response_data = false;
+		$has_delta_text    = false;
+
+		foreach ( $events as $event ) {
+			if ( ! $event instanceof WP_AI_Client_SSE_Event || $event->is_done() ) {
+				continue;
+			}
+
+			$data = $event->get_json_data();
+
+			if ( ! is_array( $data ) ) {
+				continue;
+			}
+
+			$type = $this->get_event_type( $event, $data );
+
+			if ( isset( $data['response'] ) && is_array( $data['response'] ) ) {
+				$has_response_data = true;
+				$latest_response   = $data['response'];
+				$this->copy_response_metadata_from_response_object( $response, $data['response'] );
+
+				if ( in_array( $type, array( 'response.completed', 'response.failed', 'response.incomplete' ), true ) ) {
+					$terminal_response       = $data['response'];
+					$choice['finish_reason'] = $this->get_finish_reason_from_response_object( $data['response'] );
+				}
+			}
+
+			if ( 'response.output_text.delta' === $type && isset( $data['delta'] ) && is_string( $data['delta'] ) ) {
+				$choice['content'] .= $data['delta'];
+				$has_delta_text     = true;
+				continue;
+			}
+
+			if ( 'response.output_text.done' === $type && ! $has_delta_text && isset( $data['text'] ) && is_string( $data['text'] ) ) {
+				$choice['content'] = $data['text'];
+				continue;
+			}
+
+			if ( 'response.reasoning_summary_text.delta' === $type && isset( $data['delta'] ) && is_string( $data['delta'] ) ) {
+				$choice['reasoning_content'] .= $data['delta'];
+				continue;
+			}
+
+			if ( 'response.reasoning_summary_text.done' === $type && '' === $choice['reasoning_content'] ) {
+				foreach ( array( 'text', 'summary', 'content' ) as $key ) {
+					if ( isset( $data[ $key ] ) && is_string( $data[ $key ] ) ) {
+						$choice['reasoning_content'] = $data[ $key ];
+						break;
+					}
+				}
+			}
+		}
+
+		$final_response = is_array( $terminal_response ) ? $terminal_response : $latest_response;
+
+		if ( is_array( $final_response ) ) {
+			$this->copy_response_metadata_from_response_object( $response, $final_response );
+			$choice['finish_reason'] = $this->get_finish_reason_from_response_object( $final_response );
+
+			if ( '' === $choice['content'] ) {
+				$choice['content'] = $this->extract_response_output_text( $final_response );
+			}
+		}
+
+		if ( empty( $response['id'] ) && ! empty( $contract['request_id'] ) && is_string( $contract['request_id'] ) ) {
+			$response['id'] = $contract['request_id'];
+		}
+
+		if ( '' === $choice['content'] && '' === $choice['reasoning_content'] && ! $has_response_data ) {
+			return null;
+		}
+
+		$response['choices'] = array( $this->finalize_choice( $choice ) );
+
+		$json = wp_json_encode( $response );
+
+		return false !== $json && '' !== $json ? $json : null;
+	}
+
+	/**
+	 * Returns whether the caller expects a chat-completions response object.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param array<string, mixed> $contract Streaming contract.
+	 * @return bool
+	 */
+	private function expects_chat_completions_response( array $contract ): bool {
+		if ( isset( $contract['expected_response_format'] ) && 'openai-chat-completions' === $contract['expected_response_format'] ) {
+			return true;
+		}
+
+		return isset( $contract['request_path'] )
+			&& is_string( $contract['request_path'] )
+			&& false !== strpos( strtolower( $contract['request_path'] ), '/chat/completions' );
+	}
+
+	/**
+	 * Gets the provider event type from a parsed event.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param WP_AI_Client_SSE_Event $event Parsed SSE event.
+	 * @param array<string, mixed>   $data  Event payload.
+	 * @return string
+	 */
+	private function get_event_type( WP_AI_Client_SSE_Event $event, array $data ): string {
+		if ( isset( $data['type'] ) && is_string( $data['type'] ) ) {
+			return $data['type'];
+		}
+
+		return $event->get_event();
+	}
+
+	/**
+	 * Copies chat-completion metadata from an OpenAI Responses response object.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param array<string, mixed> $response        Chat-completions response accumulator.
+	 * @param array<string, mixed> $response_object Responses API response object.
+	 * @return void
+	 */
+	private function copy_response_metadata_from_response_object( array &$response, array $response_object ): void {
+		foreach ( array( 'id', 'model' ) as $key ) {
+			if ( isset( $response_object[ $key ] ) && is_string( $response_object[ $key ] ) ) {
+				$response[ $key ] = $response_object[ $key ];
+			}
+		}
+
+		if ( isset( $response_object['created'] ) && is_numeric( $response_object['created'] ) ) {
+			$response['created'] = (int) $response_object['created'];
+		} elseif ( isset( $response_object['created_at'] ) && is_numeric( $response_object['created_at'] ) ) {
+			$response['created'] = (int) $response_object['created_at'];
+		}
+
+		if ( isset( $response_object['usage'] ) && is_array( $response_object['usage'] ) ) {
+			$response['usage'] = $this->normalize_response_usage( $response_object['usage'] );
+		}
+	}
+
+	/**
+	 * Converts Responses API usage keys to OpenAI-compatible chat usage keys.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param array<string, mixed> $usage Usage data.
+	 * @return array<string, mixed>
+	 */
+	private function normalize_response_usage( array $usage ): array {
+		$prompt_tokens     = $usage['prompt_tokens'] ?? $usage['input_tokens'] ?? 0;
+		$completion_tokens = $usage['completion_tokens'] ?? $usage['output_tokens'] ?? 0;
+		$total_tokens      = $usage['total_tokens'] ?? ( (int) $prompt_tokens + (int) $completion_tokens );
+
+		return array_merge(
+			$usage,
+			array(
+				'prompt_tokens'     => (int) $prompt_tokens,
+				'completion_tokens' => (int) $completion_tokens,
+				'total_tokens'      => (int) $total_tokens,
+			)
+		);
+	}
+
+	/**
+	 * Maps an OpenAI Responses status to a chat-completions finish reason.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param array<string, mixed> $response_object Responses API response object.
+	 * @return string
+	 */
+	private function get_finish_reason_from_response_object( array $response_object ): string {
+		$status = isset( $response_object['status'] ) && is_string( $response_object['status'] )
+			? strtolower( $response_object['status'] )
+			: '';
+
+		if ( 'incomplete' === $status ) {
+			return 'length';
+		}
+
+		if ( 'failed' === $status ) {
+			return 'content_filter';
+		}
+
+		return 'stop';
+	}
+
+	/**
+	 * Extracts final assistant text from an OpenAI Responses response object.
+	 *
+	 * @since 0.2.0
+	 *
+	 * @param array<string, mixed> $response_object Responses API response object.
+	 * @return string
+	 */
+	private function extract_response_output_text( array $response_object ): string {
+		if ( isset( $response_object['output_text'] ) && is_string( $response_object['output_text'] ) ) {
+			return $response_object['output_text'];
+		}
+
+		if ( empty( $response_object['output'] ) || ! is_array( $response_object['output'] ) ) {
+			return '';
+		}
+
+		$text = '';
+
+		foreach ( $response_object['output'] as $output_item ) {
+			if ( ! is_array( $output_item ) ) {
+				continue;
+			}
+
+			if ( isset( $output_item['content'] ) && is_string( $output_item['content'] ) ) {
+				$text .= $output_item['content'];
+				continue;
+			}
+
+			if ( empty( $output_item['content'] ) || ! is_array( $output_item['content'] ) ) {
+				continue;
+			}
+
+			foreach ( $output_item['content'] as $content_part ) {
+				if ( ! is_array( $content_part ) ) {
+					continue;
+				}
+
+				foreach ( array( 'text', 'content', 'value' ) as $key ) {
+					if ( isset( $content_part[ $key ] ) && is_string( $content_part[ $key ] ) ) {
+						$text .= $content_part[ $key ];
+						break;
+					}
+				}
+			}
+		}
+
+		return $text;
+	}
+
+	/**
 	 * Copies stable top-level response metadata from a stream chunk.
 	 *
 	 * @since 0.2.0
@@ -117,13 +398,14 @@ class WP_AI_Client_Streaming_OpenAI_Chat_Completions_Normalizer implements WP_AI
 	 */
 	private function create_empty_choice( int $index ): array {
 		return array(
-			'index'         => $index,
-			'role'          => 'assistant',
-			'content'       => '',
-			'finish_reason' => null,
-			'logprobs'      => null,
-			'function_call' => array(),
-			'tool_calls'    => array(),
+			'index'             => $index,
+			'role'              => 'assistant',
+			'content'           => '',
+			'reasoning_content' => '',
+			'finish_reason'     => null,
+			'logprobs'          => null,
+			'function_call'     => array(),
+			'tool_calls'        => array(),
 		);
 	}
 
@@ -172,6 +454,12 @@ class WP_AI_Client_Streaming_OpenAI_Chat_Completions_Normalizer implements WP_AI
 
 		if ( isset( $delta['content'] ) && is_string( $delta['content'] ) ) {
 			$choice['content'] .= $delta['content'];
+		}
+
+		foreach ( array( 'reasoning_content', 'reasoning', 'reasoning_summary' ) as $key ) {
+			if ( isset( $delta[ $key ] ) && is_string( $delta[ $key ] ) ) {
+				$choice['reasoning_content'] .= $delta[ $key ];
+			}
 		}
 
 		if ( ! empty( $delta['function_call'] ) && is_array( $delta['function_call'] ) ) {
@@ -262,6 +550,10 @@ class WP_AI_Client_Streaming_OpenAI_Chat_Completions_Normalizer implements WP_AI
 			'content' => $choice['content'],
 		);
 
+		if ( '' !== $choice['reasoning_content'] ) {
+			$message['reasoning_content'] = $choice['reasoning_content'];
+		}
+
 		if ( ! empty( $choice['function_call'] ) ) {
 			$message['function_call'] = $choice['function_call'];
 		}
@@ -273,7 +565,9 @@ class WP_AI_Client_Streaming_OpenAI_Chat_Completions_Normalizer implements WP_AI
 		return array(
 			'index'         => $choice['index'],
 			'message'       => $message,
-			'finish_reason' => $choice['finish_reason'],
+			'finish_reason' => is_string( $choice['finish_reason'] ) && '' !== $choice['finish_reason']
+				? $choice['finish_reason']
+				: 'stop',
 			'logprobs'      => $choice['logprobs'],
 		);
 	}

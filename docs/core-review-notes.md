@@ -1,6 +1,6 @@
 # Core Review Notes
 
-Date: 2026-04-18
+Date: 2026-05-22
 
 ## Goal
 
@@ -11,7 +11,7 @@ Add transport-side streaming support to the WordPress AI client without patching
 The package mirrors WordPress 7 AI conventions instead of exposing a plugin-branded runtime:
 
 - global `WP_AI_*` classes and functions
-- include-friendly `load.php` bootstrap
+- include-friendly `load.php` bootstrap with a shared package loader
 - explicit initialization through `WP_AI_Client_Streaming_Discovery_Strategy::init()`
 - a streaming-aware wrapper around `WP_AI_Client_Prompt_Builder`
 - a transport diagnostics helper for inspecting the active registry
@@ -28,7 +28,7 @@ The package mirrors WordPress 7 AI conventions instead of exposing a plugin-bran
 ### Discovery override
 
 - `WP_AI_Client_Streaming_Discovery_Strategy::init()` prepends a streaming-aware PSR-18 client through the same HTTPlug discovery path core already uses.
-- Initialization is explicit and idempotent. The package does not self-bootstrap on `plugins_loaded`.
+- Initialization is explicit and idempotent. The package loader may load the newest registered package copy on `plugins_loaded`, but it does not initialize the discovery strategy automatically.
 
 ### Prompt-builder surface
 

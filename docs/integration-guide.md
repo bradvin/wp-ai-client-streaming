@@ -4,13 +4,35 @@ Date: 2026-04-18
 
 ## Bootstrap
 
-Initialize the streaming discovery strategy early in your plugin bootstrap:
+Composer autoload registers each bundled package copy with `WP_AI_Client_Streaming_Package_Loader`. The loader waits until active plugins have loaded, selects the newest registered package version, and then loads the global `WP_AI_*` classes from that package copy.
+
+Initialize the streaming discovery strategy on or after `plugins_loaded`:
 
 ```php
-WP_AI_Client_Streaming_Discovery_Strategy::init();
+add_action(
+	'plugins_loaded',
+	static function (): void {
+		if ( wp_ai_client_streaming_load() ) {
+			WP_AI_Client_Streaming_Discovery_Strategy::init();
+		}
+	},
+	PHP_INT_MAX
+);
 ```
 
-The initialization call is idempotent and only needs to run once per request.
+The initialization call is idempotent and only needs to run once per request. Direct references to package classes should also happen on or after `plugins_loaded`; the helper functions are available earlier as proxies, but they load the selected package before doing real work.
+
+## Shared Package Version
+
+Because this package uses global WordPress-style symbols, only one version can be active in a request. If several plugins include compatible package versions, the global loader chooses the highest semantic version and exposes diagnostics through:
+
+```php
+$packages = WP_AI_Client_Streaming_Package_Loader::get_registered_packages();
+$version  = WP_AI_Client_Streaming_Package_Loader::get_loaded_version();
+$path     = WP_AI_Client_Streaming_Package_Loader::get_loaded_path();
+```
+
+Plugins should require `bradvin/wp-ai-client-streaming:^1.0` or newer compatible releases so they participate in the shared-loader flow.
 
 ## Public Entry Points
 
@@ -95,7 +117,7 @@ Built-in normalizers currently cover:
 - Anthropic Messages API streams.
 - Google Generate Content streams.
 
-Add or replace normalizers with the `wp_ai_client_stream_response_normalizers` filter. A normalizer should implement `WP_AI_Client_Streaming_Response_Normalizer_Interface` and return `null` when it cannot handle the captured body.
+Add or replace normalizers with the `wp_ai_client_stream_response_normalizers` filter. A normalizer should implement `WP_AI_Client_Streaming_Response_Normalizer_Interface` and return `null` when it cannot handle the captured body. The filter receives the normalizer list and the streaming contract, including the detected expected response format when available.
 
 ## Matching Behavior
 

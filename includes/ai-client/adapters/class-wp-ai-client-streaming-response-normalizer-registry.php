@@ -40,7 +40,7 @@ class WP_AI_Client_Streaming_Response_Normalizer_Registry {
 			return $body;
 		}
 
-		foreach ( self::get_normalizers() as $normalizer ) {
+		foreach ( self::get_normalizers( $contract ) as $normalizer ) {
 			if ( ! $normalizer instanceof WP_AI_Client_Streaming_Response_Normalizer_Interface ) {
 				continue;
 			}
@@ -60,15 +60,24 @@ class WP_AI_Client_Streaming_Response_Normalizer_Registry {
 	 *
 	 * @since 0.2.0
 	 *
+	 * @param array<string, mixed> $contract Streaming contract.
 	 * @return array<int, mixed>
 	 */
-	private static function get_normalizers(): array {
+	private static function get_normalizers( array $contract ): array {
 		$normalizers = array(
-			new WP_AI_Client_Streaming_OpenAI_Responses_Normalizer(),
-			new WP_AI_Client_Streaming_OpenAI_Chat_Completions_Normalizer(),
-			new WP_AI_Client_Streaming_Anthropic_Messages_Normalizer(),
-			new WP_AI_Client_Streaming_Google_Generate_Content_Normalizer(),
+			'openai-responses'         => new WP_AI_Client_Streaming_OpenAI_Responses_Normalizer(),
+			'openai-chat-completions' => new WP_AI_Client_Streaming_OpenAI_Chat_Completions_Normalizer(),
+			'anthropic-messages'      => new WP_AI_Client_Streaming_Anthropic_Messages_Normalizer(),
+			'google-generate-content' => new WP_AI_Client_Streaming_Google_Generate_Content_Normalizer(),
 		);
+
+		$expected_format = isset( $contract['expected_response_format'] ) && is_string( $contract['expected_response_format'] )
+			? $contract['expected_response_format']
+			: '';
+
+		if ( isset( $normalizers[ $expected_format ] ) ) {
+			$normalizers = array( $expected_format => $normalizers[ $expected_format ] ) + $normalizers;
+		}
 
 		if ( function_exists( 'apply_filters' ) ) {
 			/**
@@ -78,9 +87,10 @@ class WP_AI_Client_Streaming_Response_Normalizer_Registry {
 			 *
 			 * @since 0.2.0
 			 *
-			 * @param array<int, mixed> $normalizers Registered normalizers.
+			 * @param array<int|string, mixed> $normalizers Registered normalizers.
+			 * @param array<string, mixed>     $contract    Streaming contract.
 			 */
-			$normalizers = apply_filters( 'wp_ai_client_stream_response_normalizers', $normalizers );
+			$normalizers = apply_filters( 'wp_ai_client_stream_response_normalizers', $normalizers, $contract );
 		}
 
 		return is_array( $normalizers ) ? array_values( $normalizers ) : array();

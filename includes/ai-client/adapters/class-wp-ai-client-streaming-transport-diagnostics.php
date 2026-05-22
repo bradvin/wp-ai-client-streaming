@@ -107,10 +107,21 @@ class WP_AI_Client_Streaming_Transport_Diagnostics {
 	 * @return array<string, mixed>
 	 */
 	private static function get_empty_diagnostics(): array {
+		$package_loader_available = class_exists( 'WP_AI_Client_Streaming_Package_Loader', false );
+
 		return array(
 			'registry_class'           => null,
 			'transporter_class'        => null,
 			'client_class'             => null,
+			'package_version'          => $package_loader_available
+				? WP_AI_Client_Streaming_Package_Loader::get_loaded_version()
+				: null,
+			'package_path'             => $package_loader_available
+				? WP_AI_Client_Streaming_Package_Loader::get_loaded_path()
+				: null,
+			'registered_packages'      => $package_loader_available
+				? WP_AI_Client_Streaming_Package_Loader::get_registered_packages()
+				: array(),
 			'is_streaming_client'      => false,
 			'is_streaming_transporter' => false,
 			'is_active'                => false,

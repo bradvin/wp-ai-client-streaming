@@ -1,6 +1,6 @@
 # Publishing
 
-Date: 2026-04-18
+Date: 2026-05-22
 
 ## Release Version
 
@@ -8,7 +8,7 @@ Use Git tags for package versions. Do not add a `version` field to `composer.jso
 
 The current release line is:
 
-- `v0.1.x`
+- `v1.0.x`
 
 ## Preflight Checks
 
@@ -34,14 +34,14 @@ Make sure:
 Create an annotated tag:
 
 ```bash
-git tag -a v0.1.2 -m "Release v0.1.2"
+git tag -a v1.0.0 -m "Release v1.0.0"
 ```
 
 Push the branch and tag:
 
 ```bash
 git push origin main
-git push origin v0.1.2
+git push origin v1.0.0
 ```
 
 ## Submit To Packagist
@@ -57,7 +57,7 @@ Then enable automatic updates from GitHub so future tags are indexed quickly.
 Consumers can install the package with:
 
 ```bash
-composer require bradvin/wp-ai-client-streaming:^0.1
+composer require bradvin/wp-ai-client-streaming:^1.0
 ```
 
 Wrapper plugins or other projects that currently use a local path repository can then switch to the Packagist package and remove their custom repository override.
