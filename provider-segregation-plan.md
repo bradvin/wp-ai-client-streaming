@@ -1110,7 +1110,7 @@ Google:
 Docs:
 
 - [x] Update `docs/integration-guide.md`.
-- [ ] Add provider module API documentation.
+- [x] Add provider module API documentation.
 - [x] Remove docs for provider request overrides.
 - [x] Remove wording that implies provider-specific normalizers are core
   transport responsibilities.

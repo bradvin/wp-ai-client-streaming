@@ -134,6 +134,60 @@ Provider-specific request matching, request mutation, response contracts, and no
 
 Provider modules implement `WP_AI_Client_Streaming_Provider_Module_Interface` and register hooks from a static `register()` method. Add modules with the `wp_ai_client_stream_provider_modules` filter. Request changes should be implemented with `wp_ai_client_stream_prepare_request`; for example, the built-in Google module converts `generateContent` requests to `streamGenerateContent?alt=sse`.
 
+### Provider Module API
+
+Provider module classes are global WordPress-style classes. A module must implement:
+
+```php
+interface WP_AI_Client_Streaming_Provider_Module_Interface {
+	public static function register(): void;
+}
+```
+
+Register extra modules by filtering the class list:
+
+```php
+add_filter(
+	'wp_ai_client_stream_provider_modules',
+	static function ( array $providers ): array {
+		$providers['acme'] = 'Acme_AI_Streaming_Provider';
+		return $providers;
+	}
+);
+```
+
+The registry calls `register()` once per request. Provider modules should also guard their own `register()` method with a static boolean so direct calls stay idempotent.
+
+Most provider modules register these filters:
+
+- `wp_ai_client_stream_context_matches_request`: return `true` for a confident match, `false` only for an explicit veto, and `null` when undecided.
+- `wp_ai_client_stream_request_analysis`: set provider metadata such as `provider`, `operation`, and optional parsed request details under `meta`.
+- `wp_ai_client_stream_prepare_request`: return a prepared `url` and `analysis` array after provider URL, header, or body mutation.
+- `wp_ai_client_stream_response_contract`: set provider response details such as `provider`, `operation`, and `expected_response_format`.
+- `wp_ai_client_stream_response_normalizers`: add normalizer instances keyed by response format.
+
+The transport validates filtered request and contract shapes. Invalid `wp_ai_client_stream_prepare_request` results are ignored, and unsafe URLs are validated after request preparation.
+
+Minimal module skeleton:
+
+```php
+class Acme_AI_Streaming_Provider implements WP_AI_Client_Streaming_Provider_Module_Interface {
+	private static bool $registered = false;
+
+	public static function register(): void {
+		if ( self::$registered ) {
+			return;
+		}
+
+		self::$registered = true;
+
+		add_filter( 'wp_ai_client_stream_request_analysis', array( __CLASS__, 'analyze_request' ), 10, 2 );
+		add_filter( 'wp_ai_client_stream_prepare_request', array( __CLASS__, 'prepare_request' ), 10, 2 );
+		add_filter( 'wp_ai_client_stream_response_contract', array( __CLASS__, 'response_contract' ), 10, 3 );
+	}
+}
+```
+
 ## Matching Behavior
 
 Provider modules first decide whether an active streaming context should attach to an outbound request. If no provider decides, the generic fallback attaches to mutating HTTP methods (`POST`, `PUT`, or `PATCH`) while a streaming context is active.
