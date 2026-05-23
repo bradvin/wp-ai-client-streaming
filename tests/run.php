@@ -1466,6 +1466,214 @@ namespace {
 			wp_stream_test_same( 'lookup', $google_multi_json['candidates'][0]['content']['parts'][0]['functionCall']['name'], 'Google normalizer should sort candidates by index.' );
 			wp_stream_test_same( 'B', $google_multi_json['candidates'][1]['content']['parts'][0]['text'], 'Google normalizer should preserve later candidate indexes.' );
 			wp_stream_test_same( 'none', $google_multi_json['promptFeedback']['blockReason'], 'Google normalizer should preserve prompt feedback.' );
+
+			$google_tool_signature = WP_AI_Client_Streaming_Response_Normalizer_Registry::normalize(
+				wp_stream_test_sse(
+					array(
+						array(
+							'data' => array(
+								'candidates' => array(
+									array(
+										'content' => array(
+											'parts' => array(
+												array(
+													'functionCall'     => array(
+														'name' => 'lookup',
+														'args' => array( 'id' => 7 ),
+													),
+													'thoughtSignature' => 'signature-a',
+												),
+											),
+										),
+									),
+								),
+							),
+						),
+					)
+				),
+				array(
+					'mode'                     => 'sse',
+					'expected_response_format' => 'google-generate-content',
+				)
+			);
+			$google_tool_signature_json = wp_stream_test_decode_json( $google_tool_signature );
+			wp_stream_test_same( 'signature-a', $google_tool_signature_json['candidates'][0]['content']['parts'][0]['thoughtSignature'], 'Google normalizer should preserve function call thought signatures.' );
+		}
+	);
+
+	wp_stream_test_run(
+		'google thought signature shim restores missing request signatures',
+		static function (): void {
+			$url           = 'https://generativelanguage.googleapis.com/v1beta/models/gemini:generateContent?key=abc';
+			$base_contents = array(
+				array(
+					'role'  => 'user',
+					'parts' => array(
+						array( 'text' => 'Build a sale popup.' ),
+					),
+				),
+			);
+
+			$first = wp_stream_test_provider_flow(
+				$url,
+				array(
+					'contents' => $base_contents,
+					'stream'   => true,
+				)
+			);
+
+			wp_stream_test_assert( isset( $first['contract']['google_thought_signature_cache_key'] ), 'Google contracts should carry the thought signature cache key.' );
+
+			WP_AI_Client_Streaming_Response_Normalizer_Registry::normalize(
+				wp_stream_test_sse(
+					array(
+						array(
+							'data' => array(
+								'candidates' => array(
+									array(
+										'content' => array(
+											'parts' => array(
+												array(
+													'functionCall'     => array(
+														'name' => 'lookup',
+														'args' => array( 'id' => 7 ),
+													),
+													'thoughtSignature' => 'signature-a',
+												),
+											),
+										),
+									),
+								),
+							),
+						),
+					)
+				),
+				$first['contract']
+			);
+
+			$second_contents = array_merge(
+				$base_contents,
+				array(
+					array(
+						'role'  => 'model',
+						'parts' => array(
+							array(
+								'functionCall' => array(
+									'name' => 'lookup',
+									'args' => array( 'id' => 7 ),
+								),
+							),
+						),
+					),
+					array(
+						'role'  => 'user',
+						'parts' => array(
+							array(
+								'functionResponse' => array(
+									'name'     => 'lookup',
+									'response' => array(
+										'name'    => 'lookup',
+										'content' => array( 'ok' => true ),
+									),
+								),
+							),
+						),
+					),
+				)
+			);
+
+			$second = wp_stream_test_provider_flow(
+				$url,
+				array(
+					'contents' => $second_contents,
+					'stream'   => true,
+				)
+			);
+			$second_body = wp_stream_test_decode_json( $second['prepared']['analysis']['body'] );
+
+			wp_stream_test_same( 'signature-a', $second_body['contents'][1]['parts'][0]['thoughtSignature'], 'Google shim should restore a missing thought signature on the next function call turn.' );
+
+			$provider_supported_contents                                      = $second_contents;
+			$provider_supported_contents[1]['parts'][0]['thoughtSignature'] = 'provider-signature';
+			$provider_supported                                              = wp_stream_test_provider_flow(
+				$url,
+				array(
+					'contents' => $provider_supported_contents,
+					'stream'   => true,
+				)
+			);
+			$provider_supported_body = wp_stream_test_decode_json( $provider_supported['prepared']['analysis']['body'] );
+
+			wp_stream_test_same( 'provider-signature', $provider_supported_body['contents'][1]['parts'][0]['thoughtSignature'], 'Google shim should not overwrite provider-supplied thought signatures.' );
+
+			WP_AI_Client_Streaming_Response_Normalizer_Registry::normalize(
+				wp_stream_test_sse(
+					array(
+						array(
+							'data' => array(
+								'candidates' => array(
+									array(
+										'content' => array(
+											'parts' => array(
+												array(
+													'functionCall'     => array(
+														'name' => 'validate',
+														'args' => array( 'draft' => 'bar' ),
+													),
+													'thoughtSignature' => 'signature-b',
+												),
+											),
+										),
+									),
+								),
+							),
+						),
+					)
+				),
+				$second['contract']
+			);
+
+			$third_contents = array_merge(
+				$second_contents,
+				array(
+					array(
+						'role'  => 'model',
+						'parts' => array(
+							array(
+								'functionCall' => array(
+									'name' => 'validate',
+									'args' => array( 'draft' => 'bar' ),
+								),
+							),
+						),
+					),
+					array(
+						'role'  => 'user',
+						'parts' => array(
+							array(
+								'functionResponse' => array(
+									'name'     => 'validate',
+									'response' => array(
+										'name'    => 'validate',
+										'content' => array( 'valid' => true ),
+									),
+								),
+							),
+						),
+					),
+				)
+			);
+			$third          = wp_stream_test_provider_flow(
+				$url,
+				array(
+					'contents' => $third_contents,
+					'stream'   => true,
+				)
+			);
+			$third_body     = wp_stream_test_decode_json( $third['prepared']['analysis']['body'] );
+
+			wp_stream_test_same( 'signature-a', $third_body['contents'][1]['parts'][0]['thoughtSignature'], 'Google shim should keep earlier function call signatures available for later turns.' );
+			wp_stream_test_same( 'signature-b', $third_body['contents'][3]['parts'][0]['thoughtSignature'], 'Google shim should restore later function call signatures by history prefix.' );
 		}
 	);
 

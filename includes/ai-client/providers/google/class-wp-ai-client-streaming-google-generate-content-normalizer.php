@@ -79,6 +79,10 @@ class WP_AI_Client_Streaming_Google_Generate_Content_Normalizer implements WP_AI
 			)
 		);
 
+		if ( class_exists( 'WP_AI_Client_Streaming_Google_Provider', false ) ) {
+			WP_AI_Client_Streaming_Google_Provider::capture_thought_signatures_from_response( $response, $contract );
+		}
+
 		$json = wp_json_encode( $response );
 
 		return false !== $json && '' !== $json ? $json : null;
@@ -194,6 +198,12 @@ class WP_AI_Client_Streaming_Google_Generate_Content_Normalizer implements WP_AI
 			if ( isset( $delta[ $key ] ) ) {
 				$part[ $key ] = $delta[ $key ];
 			}
+		}
+
+		if ( isset( $delta['thoughtSignature'] ) && is_string( $delta['thoughtSignature'] ) ) {
+			$part['thoughtSignature'] = $delta['thoughtSignature'];
+		} elseif ( isset( $delta['thought_signature'] ) && is_string( $delta['thought_signature'] ) ) {
+			$part['thoughtSignature'] = $delta['thought_signature'];
 		}
 
 		if ( isset( $delta['thought'] ) ) {
