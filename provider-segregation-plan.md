@@ -1054,19 +1054,19 @@ Assert:
 
 Core:
 
-- [ ] Add `WP_AI_Client_Streaming_Provider_Module_Interface`.
-- [ ] Add `WP_AI_Client_Streaming_Provider_Registry`.
-- [ ] Add `includes/ai-client/providers/load.php`.
-- [ ] Add `wp_ai_client_stream_provider_modules`.
+- [x] Add `WP_AI_Client_Streaming_Provider_Module_Interface`.
+- [x] Add `WP_AI_Client_Streaming_Provider_Registry`.
+- [x] Add `includes/ai-client/providers/load.php`.
+- [x] Add `wp_ai_client_stream_provider_modules`.
 - [ ] Add `wp_ai_client_stream_context_matches_request`.
 - [ ] Add `wp_ai_client_stream_request_analysis`.
 - [ ] Add `wp_ai_client_stream_prepare_request`.
 - [ ] Add `wp_ai_client_stream_response_contract`.
 - [ ] Add `wp_ai_client_stream_normalize_response_body`.
-- [ ] Keep `wp_ai_client_stream_response_normalizers` as the normalizer registry hook.
+- [x] Keep `wp_ai_client_stream_response_normalizers` as the normalizer registry hook.
 - [ ] Delete `wp_ai_client_stream_provider_request_overrides`.
 - [ ] Delete provider request override interface and registry.
-- [ ] Make response normalizer registry default to an empty array.
+- [x] Make response normalizer registry default to an empty array.
 - [ ] Remove provider-specific response-format detection from HTTP service.
 - [ ] Remove provider-specific request matching from context.
 - [ ] Remove core `stream` request-body injection.
@@ -1075,36 +1075,36 @@ Core:
 
 OpenAI:
 
-- [ ] Move OpenAI normalizers into `providers/openai/`.
-- [ ] Add `WP_AI_Client_Streaming_OpenAI_Provider`.
+- [x] Move OpenAI normalizers into `providers/openai/`.
+- [x] Add `WP_AI_Client_Streaming_OpenAI_Provider`.
 - [ ] Register OpenAI request matching.
 - [ ] Register OpenAI request analysis.
 - [ ] Register OpenAI request preparation.
 - [ ] Register OpenAI response contract detection.
-- [ ] Register OpenAI normalizers.
+- [x] Register OpenAI normalizers.
 - [ ] Add OpenAI fixture tests.
 
 Anthropic:
 
-- [ ] Move Anthropic normalizer into `providers/anthropic/`.
-- [ ] Add `WP_AI_Client_Streaming_Anthropic_Provider`.
+- [x] Move Anthropic normalizer into `providers/anthropic/`.
+- [x] Add `WP_AI_Client_Streaming_Anthropic_Provider`.
 - [ ] Register Anthropic request matching.
 - [ ] Register Anthropic request analysis.
 - [ ] Register Anthropic request preparation.
 - [ ] Register Anthropic response contract detection.
-- [ ] Register Anthropic normalizer.
+- [x] Register Anthropic normalizer.
 - [ ] Add Anthropic fixture tests.
 
 Google:
 
-- [ ] Move Google normalizer into `providers/google/`.
-- [ ] Add `WP_AI_Client_Streaming_Google_Provider`.
+- [x] Move Google normalizer into `providers/google/`.
+- [x] Add `WP_AI_Client_Streaming_Google_Provider`.
 - [ ] Fold or privatize Google request override logic.
 - [ ] Register Google request matching.
 - [ ] Register Google request analysis.
 - [ ] Register Google request preparation.
 - [ ] Register Google response contract detection.
-- [ ] Register Google normalizer.
+- [x] Register Google normalizer.
 - [ ] Add Google request mutation and normalizer tests.
 
 Docs:

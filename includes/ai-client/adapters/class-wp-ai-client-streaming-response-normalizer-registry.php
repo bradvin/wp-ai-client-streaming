@@ -64,20 +64,7 @@ class WP_AI_Client_Streaming_Response_Normalizer_Registry {
 	 * @return array<int, mixed>
 	 */
 	private static function get_normalizers( array $contract ): array {
-		$normalizers = array(
-			'openai-responses'         => new WP_AI_Client_Streaming_OpenAI_Responses_Normalizer(),
-			'openai-chat-completions' => new WP_AI_Client_Streaming_OpenAI_Chat_Completions_Normalizer(),
-			'anthropic-messages'      => new WP_AI_Client_Streaming_Anthropic_Messages_Normalizer(),
-			'google-generate-content' => new WP_AI_Client_Streaming_Google_Generate_Content_Normalizer(),
-		);
-
-		$expected_format = isset( $contract['expected_response_format'] ) && is_string( $contract['expected_response_format'] )
-			? $contract['expected_response_format']
-			: '';
-
-		if ( isset( $normalizers[ $expected_format ] ) ) {
-			$normalizers = array( $expected_format => $normalizers[ $expected_format ] ) + $normalizers;
-		}
+		$normalizers = array();
 
 		if ( function_exists( 'apply_filters' ) ) {
 			/**
@@ -93,6 +80,18 @@ class WP_AI_Client_Streaming_Response_Normalizer_Registry {
 			$normalizers = apply_filters( 'wp_ai_client_stream_response_normalizers', $normalizers, $contract );
 		}
 
-		return is_array( $normalizers ) ? array_values( $normalizers ) : array();
+		if ( ! is_array( $normalizers ) ) {
+			return array();
+		}
+
+		$expected_format = isset( $contract['expected_response_format'] ) && is_string( $contract['expected_response_format'] )
+			? $contract['expected_response_format']
+			: '';
+
+		if ( isset( $normalizers[ $expected_format ] ) ) {
+			$normalizers = array( $expected_format => $normalizers[ $expected_format ] ) + $normalizers;
+		}
+
+		return array_values( $normalizers );
 	}
 }

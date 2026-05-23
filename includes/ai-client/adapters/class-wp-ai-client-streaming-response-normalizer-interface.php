@@ -15,8 +15,6 @@ if ( interface_exists( 'WP_AI_Client_Streaming_Response_Normalizer_Interface', f
  * Normalizes captured provider SSE output into the final JSON shape expected by provider parsers.
  *
  * @since 0.2.0
- * @internal Intended only to support the streaming HTTP adapter.
- * @access private
  */
 interface WP_AI_Client_Streaming_Response_Normalizer_Interface {
 
