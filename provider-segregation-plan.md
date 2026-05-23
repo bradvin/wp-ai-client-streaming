@@ -1082,7 +1082,7 @@ OpenAI:
 - [x] Register OpenAI request preparation.
 - [x] Register OpenAI response contract detection.
 - [x] Register OpenAI normalizers.
-- [ ] Add OpenAI fixture tests.
+- [x] Add OpenAI fixture tests.
 
 Anthropic:
 
@@ -1093,7 +1093,7 @@ Anthropic:
 - [x] Register Anthropic request preparation.
 - [x] Register Anthropic response contract detection.
 - [x] Register Anthropic normalizer.
-- [ ] Add Anthropic fixture tests.
+- [x] Add Anthropic fixture tests.
 
 Google:
 
@@ -1105,7 +1105,7 @@ Google:
 - [x] Register Google request preparation.
 - [x] Register Google response contract detection.
 - [x] Register Google normalizer.
-- [ ] Add Google request mutation and normalizer tests.
+- [x] Add Google request mutation and normalizer tests.
 
 Docs:
 
