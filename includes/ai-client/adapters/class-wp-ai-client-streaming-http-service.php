@@ -122,25 +122,7 @@ class WP_AI_Client_Streaming_HTTP_Service {
 		$streaming_request = $this->prepareStreamingRequest( $url, $analysis, $request );
 		$url               = $streaming_request['url'];
 		$analysis          = $streaming_request['analysis'];
-		$contract          = $this->prepareResponseNormalizationContract( $analysis['contract'], $url, $analysis );
 		$parsed_args       = $this->prepareWpArgs( $request, $options, $url, $analysis );
-
-		$pre = apply_filters( 'pre_http_request', false, $parsed_args, $url );
-		if ( false !== $pre ) {
-			do_action( 'http_api_debug', $pre, 'response', 'WP_AI_Client_Streaming_HTTP_Client', $parsed_args, $url );
-
-			if ( is_wp_error( $pre ) ) {
-				throw $this->createNetworkException( $request, $url, $pre );
-			}
-
-			$pre = apply_filters( 'http_response', $pre, $parsed_args, $url );
-
-			if ( is_wp_error( $pre ) ) {
-				throw $this->createNetworkException( $request, $url, $pre );
-			}
-
-			return $this->createPsrResponse( $pre, $contract );
-		}
 
 		if ( function_exists( 'wp_kses_bad_protocol' ) ) {
 			if ( ! empty( $parsed_args['reject_unsafe_urls'] ) ) {
@@ -158,6 +140,25 @@ class WP_AI_Client_Streaming_HTTP_Service {
 			$error = new WP_Error( 'http_request_failed', __( 'A valid URL was not provided.' ) );
 			do_action( 'http_api_debug', $error, 'response', 'WP_AI_Client_Streaming_HTTP_Client', $parsed_args, $url );
 			throw $this->createNetworkException( $request, $url, $error );
+		}
+
+		$contract = $this->prepareResponseNormalizationContract( $analysis['contract'], $url, $analysis );
+
+		$pre = apply_filters( 'pre_http_request', false, $parsed_args, $url );
+		if ( false !== $pre ) {
+			do_action( 'http_api_debug', $pre, 'response', 'WP_AI_Client_Streaming_HTTP_Client', $parsed_args, $url );
+
+			if ( is_wp_error( $pre ) ) {
+				throw $this->createNetworkException( $request, $url, $pre );
+			}
+
+			$pre = apply_filters( 'http_response', $pre, $parsed_args, $url );
+
+			if ( is_wp_error( $pre ) ) {
+				throw $this->createNetworkException( $request, $url, $pre );
+			}
+
+			return $this->createPsrResponse( $pre, $contract );
 		}
 
 		$http = new WP_Http();

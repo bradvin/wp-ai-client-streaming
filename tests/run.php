@@ -922,9 +922,15 @@ namespace {
 				$prepared['url'] = 'ftp://example.com/not-allowed';
 				return $prepared;
 			};
+			$pre_seen = false;
+			$pre      = static function () use ( &$pre_seen ) {
+				$pre_seen = true;
+				return false;
+			};
 			$thrown   = false;
 
 			add_filter( 'wp_ai_client_stream_prepare_request', $mutator, 200, 2 );
+			add_filter( 'pre_http_request', $pre, 10, 3 );
 
 			try {
 				wp_stream_test_call_private( $service, 'sendStreamingRequest', array( $request, null, $analysis ) );
@@ -932,9 +938,11 @@ namespace {
 				$thrown = true;
 			} finally {
 				remove_filter( 'wp_ai_client_stream_prepare_request', $mutator, 200 );
+				remove_filter( 'pre_http_request', $pre, 10 );
 			}
 
 			wp_stream_test_assert( $thrown, 'Unsafe URL introduced by request preparation should be rejected before execution.' );
+			wp_stream_test_same( false, $pre_seen, 'Unsafe URL introduced by request preparation should be rejected before pre_http_request.' );
 		}
 	);
 

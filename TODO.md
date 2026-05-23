@@ -43,8 +43,8 @@ Architecture and verification follow-ups from the PHP architecture review of
   - Relevant files:
     - `includes/ai-client/adapters/class-wp-ai-client-streaming-response-normalizer-interface.php`
     - `includes/ai-client/adapters/class-wp-ai-client-streaming-response-normalizer-registry.php`
-    - `includes/ai-client/providers/class-wp-ai-client-streaming-provider-request-override-interface.php`
-    - `includes/ai-client/providers/class-wp-ai-client-streaming-provider-request-override-registry.php`
+    - `includes/ai-client/providers/class-wp-ai-client-streaming-provider-module-interface.php`
+    - `includes/ai-client/providers/class-wp-ai-client-streaming-provider-registry.php`
 
 - [ ] Plan for multi-version Composer loading limits.
   - Keep global helper functions as a tiny backward-compatible ABI.

@@ -11,7 +11,7 @@ All notable changes to `bradvin/wp-ai-client-streaming` will be documented in th
 - Add early proxy helpers for `wp_ai_client_stream_prompt()` and `wp_ai_client_stream()` so wrapper plugins can detect the public API during bootstrap.
 - Add loaded package version, path, and registered package metadata to transport diagnostics.
 - Route Google `generateContent` streaming requests through `streamGenerateContent?alt=sse` and remove the unsupported OpenAI-style `stream` payload field.
-- Move provider-specific streaming request adjustments behind `WP_AI_Client_Streaming_Provider_Request_Override_Registry` and provider-specific folders.
+- Move provider-specific streaming request adjustments behind provider modules and the `wp_ai_client_stream_prepare_request` filter.
 - Bump the documented Composer constraint to `^1.0`.
 
 ## 0.1.3 - 2026-05-22
