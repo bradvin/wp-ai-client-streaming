@@ -119,6 +119,12 @@ Built-in normalizers currently cover:
 
 Add or replace normalizers with the `wp_ai_client_stream_response_normalizers` filter. A normalizer should implement `WP_AI_Client_Streaming_Response_Normalizer_Interface` and return `null` when it cannot handle the captured body. The filter receives the normalizer list and the streaming contract, including the detected expected response format when available.
 
+## Provider Request Overrides
+
+Some providers need request changes before the transport can use their streaming API. For example, Google Gemini uses `streamGenerateContent?alt=sse` instead of adding a `stream` field to the `generateContent` JSON body.
+
+Built-in request overrides live in provider-specific folders under `includes/ai-client/providers/`. Add or replace request overrides with the `wp_ai_client_stream_provider_request_overrides` filter. An override should implement `WP_AI_Client_Streaming_Provider_Request_Override_Interface` and return the adjusted request URL and analysis array.
+
 ## Matching Behavior
 
 By default, the streaming context targets text-style JSON generation requests:
