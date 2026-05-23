@@ -4,6 +4,8 @@ All notable changes to `bradvin/wp-ai-client-streaming` will be documented in th
 
 ## Unreleased
 
+- Infer OpenAI chat-completions response normalization from `/chat/completions` request paths when an explicit response contract is unavailable.
+
 ## 1.0.0 - 2026-05-22
 
 - Add `WP_AI_Client_Streaming_Package_Loader`, a global loader that lets multiple bundled package copies register themselves and loads the newest registered version.

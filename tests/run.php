@@ -1160,6 +1160,62 @@ namespace {
 			$openai_gateway_json = wp_stream_test_decode_json( $openai_gateway );
 			wp_stream_test_same( 'Gateway ', $openai_gateway_json['choices'][0]['message']['content'], 'OpenAI chat normalizer should convert Responses-style gateway text deltas.' );
 
+			$openai_gateway_inferred = WP_AI_Client_Streaming_Response_Normalizer_Registry::normalize(
+				wp_stream_test_sse(
+					array(
+						array(
+							'event' => 'response.output_text.delta',
+							'data'  => array(
+								'type'  => 'response.output_text.delta',
+								'delta' => 'Gateway inferred',
+							),
+						),
+						array(
+							'event' => 'response.completed',
+							'data'  => array(
+								'type'     => 'response.completed',
+								'response' => array(
+									'id'          => 'resp_gateway_inferred',
+									'status'      => 'completed',
+									'output_text' => 'Gateway inferred',
+								),
+							),
+						),
+					)
+				),
+				array(
+					'mode'         => 'sse',
+					'request_path' => '/v1/chat/completions',
+					'request_id'   => 'fallback-id',
+				)
+			);
+			$openai_gateway_inferred_json = wp_stream_test_decode_json( $openai_gateway_inferred );
+			wp_stream_test_same( 'Gateway inferred', $openai_gateway_inferred_json['choices'][0]['message']['content'], 'OpenAI chat normalizer should infer chat completions from the request path.' );
+
+			$openai_responses_inferred = WP_AI_Client_Streaming_Response_Normalizer_Registry::normalize(
+				wp_stream_test_sse(
+					array(
+						array(
+							'event' => 'response.completed',
+							'data'  => array(
+								'type'     => 'response.completed',
+								'response' => array(
+									'id'          => 'resp_responses_inferred',
+									'status'      => 'completed',
+									'output_text' => 'Responses inferred',
+								),
+							),
+						),
+					)
+				),
+				array(
+					'mode'         => 'sse',
+					'request_path' => '/v1/responses',
+				)
+			);
+			$openai_responses_inferred_json = wp_stream_test_decode_json( $openai_responses_inferred );
+			wp_stream_test_same( 'resp_responses_inferred', $openai_responses_inferred_json['id'], 'OpenAI Responses normalizer should infer Responses format from the request path.' );
+
 			$openai_gateway_terminal = WP_AI_Client_Streaming_Response_Normalizer_Registry::normalize(
 				wp_stream_test_sse(
 					array(

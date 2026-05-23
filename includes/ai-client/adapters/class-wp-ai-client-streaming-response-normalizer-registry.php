@@ -84,14 +84,58 @@ class WP_AI_Client_Streaming_Response_Normalizer_Registry {
 			return array();
 		}
 
-		$expected_format = isset( $contract['expected_response_format'] ) && is_string( $contract['expected_response_format'] )
-			? $contract['expected_response_format']
-			: '';
+		$expected_format = self::get_expected_response_format( $contract );
 
 		if ( isset( $normalizers[ $expected_format ] ) ) {
 			$normalizers = array( $expected_format => $normalizers[ $expected_format ] ) + $normalizers;
 		}
 
 		return array_values( $normalizers );
+	}
+
+	/**
+	 * Resolves the expected final response format from an explicit contract or request path.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array<string, mixed> $contract Streaming contract.
+	 * @return string
+	 */
+	private static function get_expected_response_format( array $contract ): string {
+		if ( isset( $contract['expected_response_format'] ) && is_string( $contract['expected_response_format'] ) && '' !== $contract['expected_response_format'] ) {
+			return $contract['expected_response_format'];
+		}
+
+		$request_path = self::get_request_path( $contract );
+
+		if ( false !== strpos( $request_path, '/chat/completions' ) ) {
+			return 'openai-chat-completions';
+		}
+
+		if ( preg_match( '#/responses/?$#', $request_path ) ) {
+			return 'openai-responses';
+		}
+
+		return '';
+	}
+
+	/**
+	 * Returns a normalized request path from the streaming contract.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array<string, mixed> $contract Streaming contract.
+	 * @return string
+	 */
+	private static function get_request_path( array $contract ): string {
+		if ( isset( $contract['request_path'] ) && is_string( $contract['request_path'] ) ) {
+			return strtolower( $contract['request_path'] );
+		}
+
+		if ( isset( $contract['request_url'] ) && is_string( $contract['request_url'] ) ) {
+			return strtolower( (string) parse_url( $contract['request_url'], PHP_URL_PATH ) );
+		}
+
+		return '';
 	}
 }
