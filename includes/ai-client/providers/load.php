@@ -15,8 +15,8 @@ require_once __DIR__ . '/google/class-wp-ai-client-streaming-google-provider.php
 
 WP_AI_Client_Streaming_Provider_Registry::register(
 	array(
-		'openai'    => 'WP_AI_Client_Streaming_OpenAI_Provider',
-		'anthropic' => 'WP_AI_Client_Streaming_Anthropic_Provider',
 		'google'    => 'WP_AI_Client_Streaming_Google_Provider',
+		'anthropic' => 'WP_AI_Client_Streaming_Anthropic_Provider',
+		'openai'    => 'WP_AI_Client_Streaming_OpenAI_Provider',
 	)
 );

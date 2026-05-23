@@ -288,7 +288,6 @@ class WP_AI_Client_Streaming_Context {
 			'mode'                    => 'sse',
 			'streaming_enabled'       => true,
 			'capture_body'            => true,
-			'inject_stream_parameter' => true,
 			'request_id'              => function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid( 'wp-ai-client-stream-', true ),
 			'max_requests'            => 1,
 			'request_matcher'         => null,
@@ -381,11 +380,38 @@ class WP_AI_Client_Streaming_Context {
 			return true === call_user_func( $context['request_matcher'], $request, $headers, $body, $context );
 		}
 
+		if ( function_exists( 'apply_filters' ) ) {
+			/**
+			 * Filters whether an active streaming context matches a PSR-7 request.
+			 *
+			 * Provider modules use this hook to match provider-specific request
+			 * shapes without coupling the core context matcher to provider payloads.
+			 * Return null when undecided, true to match, or false to veto.
+			 *
+			 * @since 1.0.0
+			 *
+			 * @param bool|null            $matched Whether a provider matched the request.
+			 * @param object               $request PSR-7 request.
+			 * @param array<string,string> $headers Request headers.
+			 * @param string|null          $body    Request body.
+			 * @param array<string,mixed>  $context Active streaming context.
+			 */
+			$matched = apply_filters( 'wp_ai_client_stream_context_matches_request', null, $request, $headers, $body, $context );
+
+			if ( true === $matched ) {
+				return true;
+			}
+
+			if ( false === $matched ) {
+				return false;
+			}
+		}
+
 		return self::default_request_matcher( $request, $headers, $body );
 	}
 
 	/**
-	 * Default request matcher for text-style generation requests.
+	 * Default request matcher for mutating requests in a streaming context.
 	 *
 	 * @since 0.2.0
 	 *
@@ -401,23 +427,7 @@ class WP_AI_Client_Streaming_Context {
 			return false;
 		}
 
-		if ( self::header_contains( $headers, 'accept', 'text/event-stream' ) ) {
-			return true;
-		}
-
-		$payload = self::decode_json_body( $headers, $body );
-
-		if ( ! is_array( $payload ) ) {
-			return false;
-		}
-
-		foreach ( array( 'messages', 'input', 'contents' ) as $key ) {
-			if ( array_key_exists( $key, $payload ) ) {
-				return true;
-			}
-		}
-
-		return ! empty( $payload['stream'] );
+		return true;
 	}
 
 	/**
@@ -443,10 +453,6 @@ class WP_AI_Client_Streaming_Context {
 			if ( is_array( $mutated_payload ) ) {
 				$payload = $mutated_payload;
 			}
-		}
-
-		if ( ! empty( $context['inject_stream_parameter'] ) ) {
-			$payload['stream'] = true;
 		}
 
 		$encoded = wp_json_encode( $payload );

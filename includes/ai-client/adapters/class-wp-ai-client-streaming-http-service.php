@@ -119,7 +119,7 @@ class WP_AI_Client_Streaming_HTTP_Service {
 	 */
 	private function sendStreamingRequest( $request, $options, array $analysis ) {
 		$url               = (string) $request->getUri();
-		$streaming_request = WP_AI_Client_Streaming_Provider_Request_Override_Registry::prepare( $url, $analysis );
+		$streaming_request = $this->prepareStreamingRequest( $url, $analysis, $request );
 		$url               = $streaming_request['url'];
 		$analysis          = $streaming_request['analysis'];
 		$contract          = $this->prepareResponseNormalizationContract( $analysis['contract'], $url, $analysis );
@@ -203,61 +203,31 @@ class WP_AI_Client_Streaming_HTTP_Service {
 	 * @return array<string, mixed>
 	 */
 	private function prepareResponseNormalizationContract( array $contract, string $url, array $analysis ): array {
-		$contract['request_url']              = $url;
-		$contract['request_path']             = (string) parse_url( $url, PHP_URL_PATH );
-		$contract['expected_response_format'] = $this->detectExpectedResponseFormat( $url, $analysis['headers'] ?? array(), $analysis['body'] ?? null );
+		$contract['request_url']  = $url;
+		$contract['request_path'] = (string) parse_url( $url, PHP_URL_PATH );
+		$fallback_contract        = $contract;
 
-		return $contract;
-	}
+		if ( function_exists( 'apply_filters' ) ) {
+			/**
+			 * Filters the streaming response normalization contract.
+			 *
+			 * Provider modules use this hook to declare their expected final
+			 * response shape after request preparation has completed.
+			 *
+			 * @since 1.0.0
+			 *
+			 * @param array<string, mixed> $contract Streaming contract.
+			 * @param string               $url      Prepared request URL.
+			 * @param array<string, mixed> $analysis Request analysis.
+			 */
+			$filtered_contract = apply_filters( 'wp_ai_client_stream_response_contract', $contract, $url, $analysis );
 
-	/**
-	 * Detects the non-streaming response shape the provider parser expects.
-	 *
-	 * @since 0.2.0
-	 *
-	 * @param string                    $url     Request URL.
-	 * @param array<string, string>     $headers Request headers.
-	 * @param string|null               $body    Request body.
-	 * @return string|null
-	 */
-	private function detectExpectedResponseFormat( string $url, array $headers, ?string $body ): ?string {
-		$path = strtolower( (string) parse_url( $url, PHP_URL_PATH ) );
-
-		if ( false !== strpos( $path, '/chat/completions' ) ) {
-			return 'openai-chat-completions';
+			if ( is_array( $filtered_contract ) ) {
+				$contract = $filtered_contract;
+			}
 		}
 
-		if ( preg_match( '#/responses/?$#', $path ) ) {
-			return 'openai-responses';
-		}
-
-		if ( false !== strpos( $path, '/messages' ) ) {
-			return 'anthropic-messages';
-		}
-
-		if ( false !== strpos( $path, 'generatecontent' ) ) {
-			return 'google-generate-content';
-		}
-
-		if ( empty( $body ) || ! $this->looksLikeJsonRequest( $headers ) ) {
-			return null;
-		}
-
-		$decoded = json_decode( $body, true );
-
-		if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $decoded ) ) {
-			return null;
-		}
-
-		if ( isset( $decoded['messages'] ) && is_array( $decoded['messages'] ) ) {
-			return 'openai-chat-completions';
-		}
-
-		if ( isset( $decoded['contents'] ) && is_array( $decoded['contents'] ) ) {
-			return 'google-generate-content';
-		}
-
-		return null;
+		return $this->normalizeContract( $contract, $fallback_contract );
 	}
 
 	/**
@@ -766,7 +736,7 @@ class WP_AI_Client_Streaming_HTTP_Service {
 		$contract         = $context_analysis['contract'];
 
 		if ( ! $contract['enabled'] ) {
-			$detected_mode = $this->detectStreamingMode( $headers, $body );
+			$detected_mode = $this->detectStreamingMode( $headers );
 
 			if ( null !== $detected_mode ) {
 				$contract['enabled'] = true;
@@ -778,11 +748,35 @@ class WP_AI_Client_Streaming_HTTP_Service {
 			$contract['mode'] = 'sse';
 		}
 
-		return array(
+		$analysis = array(
 			'headers'  => $headers,
 			'body'     => $body,
 			'contract' => $contract,
+			'provider' => null,
+			'operation' => null,
+			'meta'     => array(),
 		);
+
+		if ( function_exists( 'apply_filters' ) ) {
+			/**
+			 * Filters streaming request analysis before request preparation.
+			 *
+			 * Provider modules use this hook to identify supported requests and
+			 * attach metadata used by later request and response contract filters.
+			 *
+			 * @since 1.0.0
+			 *
+			 * @param array<string, mixed> $analysis Request analysis.
+			 * @param object               $request  PSR-7 request.
+			 */
+			$filtered_analysis = apply_filters( 'wp_ai_client_stream_request_analysis', $analysis, $request );
+
+			if ( is_array( $filtered_analysis ) ) {
+				$analysis = $this->normalizeRequestAnalysis( $filtered_analysis, $analysis );
+			}
+		}
+
+		return $analysis;
 	}
 
 	/**
@@ -830,56 +824,142 @@ class WP_AI_Client_Streaming_HTTP_Service {
 	}
 
 	/**
-	 * Detects streaming mode from headers or request body.
+	 * Detects streaming mode from headers.
 	 *
 	 * @since 0.2.0
 	 *
 	 * @param array<string, string> $headers Headers.
-	 * @param string|null           $body    Body.
 	 * @return string|null
 	 */
-	private function detectStreamingMode( array $headers, ?string $body ): ?string {
+	private function detectStreamingMode( array $headers ): ?string {
 		foreach ( $headers as $name => $value ) {
 			if ( 'accept' === strtolower( $name ) && false !== stripos( $value, 'text/event-stream' ) ) {
 				return 'sse';
 			}
 		}
 
-		if ( empty( $body ) || ! $this->looksLikeJsonRequest( $headers ) ) {
-			return null;
-		}
-
-		$decoded = json_decode( $body, true );
-
-		if ( JSON_ERROR_NONE !== json_last_error() || ! is_array( $decoded ) ) {
-			return null;
-		}
-
-		if ( ! empty( $decoded['stream'] ) ) {
-			return 'sse';
-		}
-
 		return null;
 	}
 
 	/**
-	 * Returns whether the request looks like JSON.
+	 * Applies provider request preparation filters.
 	 *
-	 * @since 0.2.0
+	 * @since 1.0.0
 	 *
-	 * @param array<string, string> $headers Headers.
-	 * @return bool
+	 * @param string               $url      Request URL.
+	 * @param array<string, mixed> $analysis Request analysis.
+	 * @param object               $request  PSR-7 request.
+	 * @return array{url:string,analysis:array<string,mixed>}
 	 */
-	private function looksLikeJsonRequest( array $headers ): bool {
-		foreach ( $headers as $name => $value ) {
-			if ( 'content-type' !== strtolower( $name ) ) {
-				continue;
-			}
+	private function prepareStreamingRequest( string $url, array $analysis, $request ): array {
+		$prepared = array(
+			'url'      => $url,
+			'analysis' => $analysis,
+		);
 
-			return false !== stripos( $value, 'application/json' ) || false !== stripos( $value, '+json' );
+		if ( function_exists( 'apply_filters' ) ) {
+			/**
+			 * Filters the request URL and analysis before WordPress HTTP args are built.
+			 *
+			 * Provider modules use this hook to mutate streaming endpoint URLs,
+			 * headers, and request bodies without coupling core transport code to
+			 * provider-specific request formats.
+			 *
+			 * @since 1.0.0
+			 *
+			 * @param array{url:string,analysis:array<string,mixed>} $prepared Prepared request details.
+			 * @param object                                         $request  PSR-7 request.
+			 */
+			$filtered_prepared = apply_filters( 'wp_ai_client_stream_prepare_request', $prepared, $request );
+
+			if (
+				is_array( $filtered_prepared ) &&
+				isset( $filtered_prepared['url'], $filtered_prepared['analysis'] ) &&
+				is_string( $filtered_prepared['url'] ) &&
+				is_array( $filtered_prepared['analysis'] )
+			) {
+				$prepared['url']      = $filtered_prepared['url'];
+				$prepared['analysis'] = $this->normalizeRequestAnalysis( $filtered_prepared['analysis'], $analysis );
+			}
 		}
 
-		return false;
+		return $prepared;
+	}
+
+	/**
+	 * Normalizes filtered request analysis back to the required shape.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array<string, mixed> $analysis Request analysis.
+	 * @param array<string, mixed> $fallback Fallback request analysis.
+	 * @return array<string, mixed>
+	 */
+	private function normalizeRequestAnalysis( array $analysis, array $fallback ): array {
+		if ( ! isset( $analysis['headers'] ) || ! is_array( $analysis['headers'] ) ) {
+			$analysis['headers'] = $fallback['headers'] ?? array();
+		}
+
+		if ( ! array_key_exists( 'body', $analysis ) || ( null !== $analysis['body'] && ! is_string( $analysis['body'] ) ) ) {
+			$analysis['body'] = $fallback['body'] ?? null;
+		}
+
+		if ( ! isset( $analysis['contract'] ) || ! is_array( $analysis['contract'] ) ) {
+			$analysis['contract'] = $fallback['contract'] ?? array();
+		}
+
+		$analysis['contract'] = $this->normalizeContract( $analysis['contract'], $fallback['contract'] ?? array() );
+
+		if ( ! array_key_exists( 'provider', $analysis ) || ( null !== $analysis['provider'] && ! is_string( $analysis['provider'] ) ) ) {
+			$analysis['provider'] = $fallback['provider'] ?? null;
+		}
+
+		if ( ! array_key_exists( 'operation', $analysis ) || ( null !== $analysis['operation'] && ! is_string( $analysis['operation'] ) ) ) {
+			$analysis['operation'] = $fallback['operation'] ?? null;
+		}
+
+		if ( ! isset( $analysis['meta'] ) || ! is_array( $analysis['meta'] ) ) {
+			$analysis['meta'] = isset( $fallback['meta'] ) && is_array( $fallback['meta'] ) ? $fallback['meta'] : array();
+		}
+
+		return $analysis;
+	}
+
+	/**
+	 * Normalizes a filtered streaming contract.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param array<string, mixed> $contract Streaming contract.
+	 * @param array<string, mixed> $fallback Fallback streaming contract.
+	 * @return array<string, mixed>
+	 */
+	private function normalizeContract( array $contract, array $fallback = array() ): array {
+		$contract = array_merge( $fallback, $contract );
+
+		if ( ! isset( $contract['enabled'] ) ) {
+			$contract['enabled'] = false;
+		}
+
+		$contract['enabled'] = (bool) $contract['enabled'];
+
+		if ( ! array_key_exists( 'mode', $contract ) || ( null !== $contract['mode'] && ! in_array( $contract['mode'], array( 'raw', 'sse' ), true ) ) ) {
+			$contract['mode'] = $fallback['mode'] ?? null;
+		}
+
+		if ( ! isset( $contract['capture_body'] ) ) {
+			$contract['capture_body'] = true;
+		}
+
+		$contract['capture_body'] = (bool) $contract['capture_body'];
+
+		if ( empty( $contract['request_id'] ) || ! is_string( $contract['request_id'] ) ) {
+			$contract['request_id'] = isset( $fallback['request_id'] ) && is_string( $fallback['request_id'] )
+				? $fallback['request_id']
+				: ( function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : uniqid( 'wp-ai-client-stream-', true ) );
+		}
+
+		return $contract;
 	}
 
 	/**
@@ -956,17 +1036,52 @@ class WP_AI_Client_Streaming_HTTP_Service {
 			$resource_body = $this->readResponseBodyResource( $response['_body_resource'] );
 			fclose( $response['_body_resource'] );
 
-			$resource_body = WP_AI_Client_Streaming_Response_Normalizer_Registry::normalize( $resource_body, $contract );
+			$resource_body = $this->normalizeResponseBody( $resource_body, $contract, $response );
 
 			if ( '' !== $resource_body ) {
 				$psr_response = $psr_response->withBody( $this->stream_factory->createStream( $resource_body ) );
 			}
 		} elseif ( is_string( $body ) && '' !== $body ) {
-			$body         = WP_AI_Client_Streaming_Response_Normalizer_Registry::normalize( $body, $contract );
+			$body         = $this->normalizeResponseBody( $body, $contract, $response );
 			$psr_response = $psr_response->withBody( $this->stream_factory->createStream( $body ) );
 		}
 
 		return $psr_response;
+	}
+
+	/**
+	 * Normalizes a captured streaming response body.
+	 *
+	 * @since 1.0.0
+	 *
+	 * @param string               $body     Captured response body.
+	 * @param array<string, mixed> $contract Streaming contract.
+	 * @param array<string, mixed> $response WordPress HTTP response.
+	 * @return string
+	 */
+	private function normalizeResponseBody( string $body, array $contract, array $response ): string {
+		if ( function_exists( 'apply_filters' ) ) {
+			/**
+			 * Filters normalized streaming response bodies before normalizer classes run.
+			 *
+			 * Return null to leave the body unhandled and continue to the registered
+			 * response normalizer fallback.
+			 *
+			 * @since 1.0.0
+			 *
+			 * @param string|null          $normalized Normalized response body, or null when unhandled.
+			 * @param string               $body       Captured response body.
+			 * @param array<string, mixed> $contract   Streaming contract.
+			 * @param array<string, mixed> $response   WordPress HTTP response.
+			 */
+			$normalized = apply_filters( 'wp_ai_client_stream_normalize_response_body', null, $body, $contract, $response );
+
+			if ( is_string( $normalized ) ) {
+				return $normalized;
+			}
+		}
+
+		return WP_AI_Client_Streaming_Response_Normalizer_Registry::normalize( $body, $contract );
 	}
 
 	/**

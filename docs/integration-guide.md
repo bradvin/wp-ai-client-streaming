@@ -78,11 +78,10 @@ Supported `stream_args` keys:
 - `mode`: `sse` or `raw`. Defaults to `sse`.
 - `streaming_enabled`: master on/off switch. Defaults to `true`.
 - `capture_body`: whether the response body should still be buffered and rebuilt for the final result. Defaults to `true`.
-- `inject_stream_parameter`: whether `"stream": true` should be injected into matching JSON payloads. Defaults to `true`.
 - `request_id`: explicit correlation ID for the matching request.
 - `max_requests`: how many matching outbound requests inside the wrapped call should opt into streaming. Defaults to `1`.
 - `request_matcher`: callable that decides whether the active streaming context should attach to a specific PSR-7 request.
-- `payload_mutator`: callable that can mutate the decoded JSON payload before it is re-encoded and sent.
+- `payload_mutator`: callable that can mutate the decoded JSON payload before it is re-encoded and sent. Reusable provider request changes should use provider modules instead.
 - `on_chunk`: callback for raw chunks.
 - `on_event`: callback for parsed `WP_AI_Client_SSE_Event` objects.
 - `on_complete`: callback after the HTTP response finishes.
@@ -106,33 +105,38 @@ The transport emits these hooks:
 
 It also emits `requests-request.progress` while chunks are arriving so existing progress listeners can continue to work.
 
+Provider modules and advanced integrations can use these filters:
+
+- `wp_ai_client_stream_provider_modules`: replace or add provider modules.
+- `wp_ai_client_stream_context_matches_request`: decide whether a streaming context should attach to a PSR-7 request.
+- `wp_ai_client_stream_request_analysis`: add provider metadata before request preparation.
+- `wp_ai_client_stream_prepare_request`: mutate the request URL, headers, or body before the transport builds WordPress HTTP args.
+- `wp_ai_client_stream_response_contract`: declare the expected final response shape for captured streaming bodies.
+- `wp_ai_client_stream_normalize_response_body`: normalize a captured response body before class-based normalizers run.
+- `wp_ai_client_stream_response_normalizers`: add class-based response normalizers.
+
 ## Response Normalizers
 
 When `capture_body` is enabled, the transport buffers SSE output and then asks registered normalizers to rebuild the non-streaming JSON response shape expected by the upstream provider parser.
 
-Built-in normalizers currently cover:
+Built-in provider modules register normalizers for:
 
 - OpenAI Responses API streams.
 - OpenAI-compatible chat completion streams, including OpenRouter-style chunks.
 - Anthropic Messages API streams.
 - Google Generate Content streams.
 
-Add or replace normalizers with the `wp_ai_client_stream_response_normalizers` filter. A normalizer should implement `WP_AI_Client_Streaming_Response_Normalizer_Interface` and return `null` when it cannot handle the captured body. The filter receives the normalizer list and the streaming contract, including the detected expected response format when available.
+Add or replace normalizers with the `wp_ai_client_stream_response_normalizers` filter. A normalizer should implement `WP_AI_Client_Streaming_Response_Normalizer_Interface` and return `null` when it cannot handle the captured body. The filter receives the normalizer list and the streaming contract, including `expected_response_format` when a provider module declares one.
 
-## Provider Request Overrides
+## Provider Modules
 
-Some providers need request changes before the transport can use their streaming API. For example, Google Gemini uses `streamGenerateContent?alt=sse` instead of adding a `stream` field to the `generateContent` JSON body.
+Provider-specific request matching, request mutation, response contracts, and normalizer registration live in provider modules under `includes/ai-client/providers/`.
 
-Built-in request overrides live in provider-specific folders under `includes/ai-client/providers/`. Add or replace request overrides with the `wp_ai_client_stream_provider_request_overrides` filter. An override should implement `WP_AI_Client_Streaming_Provider_Request_Override_Interface` and return the adjusted request URL and analysis array.
+Provider modules implement `WP_AI_Client_Streaming_Provider_Module_Interface` and register hooks from a static `register()` method. Add modules with the `wp_ai_client_stream_provider_modules` filter. Request changes should be implemented with `wp_ai_client_stream_prepare_request`; for example, the built-in Google module converts `generateContent` requests to `streamGenerateContent?alt=sse`.
 
 ## Matching Behavior
 
-By default, the streaming context targets text-style JSON generation requests:
-
-- HTTP methods `POST`, `PUT`, or `PATCH`
-- requests whose payload contains `messages`, `input`, or `contents`
-- requests that already ask for `text/event-stream`
-- requests whose payload already contains `stream: true`
+Provider modules first decide whether an active streaming context should attach to an outbound request. If no provider decides, the generic fallback attaches to mutating HTTP methods (`POST`, `PUT`, or `PATCH`) while a streaming context is active.
 
 For more precise control, pass a custom `request_matcher`.
 

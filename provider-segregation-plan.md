@@ -1058,29 +1058,29 @@ Core:
 - [x] Add `WP_AI_Client_Streaming_Provider_Registry`.
 - [x] Add `includes/ai-client/providers/load.php`.
 - [x] Add `wp_ai_client_stream_provider_modules`.
-- [ ] Add `wp_ai_client_stream_context_matches_request`.
-- [ ] Add `wp_ai_client_stream_request_analysis`.
-- [ ] Add `wp_ai_client_stream_prepare_request`.
-- [ ] Add `wp_ai_client_stream_response_contract`.
-- [ ] Add `wp_ai_client_stream_normalize_response_body`.
+- [x] Add `wp_ai_client_stream_context_matches_request`.
+- [x] Add `wp_ai_client_stream_request_analysis`.
+- [x] Add `wp_ai_client_stream_prepare_request`.
+- [x] Add `wp_ai_client_stream_response_contract`.
+- [x] Add `wp_ai_client_stream_normalize_response_body`.
 - [x] Keep `wp_ai_client_stream_response_normalizers` as the normalizer registry hook.
-- [ ] Delete `wp_ai_client_stream_provider_request_overrides`.
-- [ ] Delete provider request override interface and registry.
+- [x] Delete `wp_ai_client_stream_provider_request_overrides`.
+- [x] Delete provider request override interface and registry.
 - [x] Make response normalizer registry default to an empty array.
-- [ ] Remove provider-specific response-format detection from HTTP service.
-- [ ] Remove provider-specific request matching from context.
-- [ ] Remove core `stream` request-body injection.
-- [ ] Add validation for filtered request and contract shapes.
-- [ ] Update loader file manifests.
+- [x] Remove provider-specific response-format detection from HTTP service.
+- [x] Remove provider-specific request matching from context.
+- [x] Remove core `stream` request-body injection.
+- [x] Add validation for filtered request and contract shapes.
+- [x] Update loader file manifests.
 
 OpenAI:
 
 - [x] Move OpenAI normalizers into `providers/openai/`.
 - [x] Add `WP_AI_Client_Streaming_OpenAI_Provider`.
-- [ ] Register OpenAI request matching.
-- [ ] Register OpenAI request analysis.
-- [ ] Register OpenAI request preparation.
-- [ ] Register OpenAI response contract detection.
+- [x] Register OpenAI request matching.
+- [x] Register OpenAI request analysis.
+- [x] Register OpenAI request preparation.
+- [x] Register OpenAI response contract detection.
 - [x] Register OpenAI normalizers.
 - [ ] Add OpenAI fixture tests.
 
@@ -1088,10 +1088,10 @@ Anthropic:
 
 - [x] Move Anthropic normalizer into `providers/anthropic/`.
 - [x] Add `WP_AI_Client_Streaming_Anthropic_Provider`.
-- [ ] Register Anthropic request matching.
-- [ ] Register Anthropic request analysis.
-- [ ] Register Anthropic request preparation.
-- [ ] Register Anthropic response contract detection.
+- [x] Register Anthropic request matching.
+- [x] Register Anthropic request analysis.
+- [x] Register Anthropic request preparation.
+- [x] Register Anthropic response contract detection.
 - [x] Register Anthropic normalizer.
 - [ ] Add Anthropic fixture tests.
 
@@ -1099,20 +1099,20 @@ Google:
 
 - [x] Move Google normalizer into `providers/google/`.
 - [x] Add `WP_AI_Client_Streaming_Google_Provider`.
-- [ ] Fold or privatize Google request override logic.
-- [ ] Register Google request matching.
-- [ ] Register Google request analysis.
-- [ ] Register Google request preparation.
-- [ ] Register Google response contract detection.
+- [x] Fold or privatize Google request override logic.
+- [x] Register Google request matching.
+- [x] Register Google request analysis.
+- [x] Register Google request preparation.
+- [x] Register Google response contract detection.
 - [x] Register Google normalizer.
 - [ ] Add Google request mutation and normalizer tests.
 
 Docs:
 
-- [ ] Update `docs/integration-guide.md`.
+- [x] Update `docs/integration-guide.md`.
 - [ ] Add provider module API documentation.
-- [ ] Remove docs for provider request overrides.
-- [ ] Remove wording that implies provider-specific normalizers are core
+- [x] Remove docs for provider request overrides.
+- [x] Remove wording that implies provider-specific normalizers are core
   transport responsibilities.
 
 ## Verification Plan
