@@ -4,9 +4,9 @@ All notable changes to `bradvin/wp-ai-client-streaming` will be documented in th
 
 ## Unreleased
 
-- Infer OpenAI chat-completions response normalization from `/chat/completions` request paths when an explicit response contract is unavailable.
+None.
 
-## 1.0.0 - 2026-05-22
+## 1.0.0 - 2026-05-24
 
 - Add `WP_AI_Client_Streaming_Package_Loader`, a global loader that lets multiple bundled package copies register themselves and loads the newest registered version.
 - Defer adapter class loading until `plugins_loaded` in WordPress requests so active plugins have a chance to register their bundled package versions before one copy wins.
@@ -14,6 +14,9 @@ All notable changes to `bradvin/wp-ai-client-streaming` will be documented in th
 - Add loaded package version, path, and registered package metadata to transport diagnostics.
 - Route Google `generateContent` streaming requests through `streamGenerateContent?alt=sse` and remove the unsupported OpenAI-style `stream` payload field.
 - Move provider-specific streaming request adjustments behind provider modules and the `wp_ai_client_stream_prepare_request` filter.
+- Infer OpenAI chat-completions response normalization from `/chat/completions` request paths when an explicit response contract is unavailable.
+- Preserve Google thought signature parts when streaming Gemini responses.
+- Re-run unsafe URL validation after provider request preparation filters.
 - Bump the documented Composer constraint to `^1.0`.
 
 ## 0.1.3 - 2026-05-22
